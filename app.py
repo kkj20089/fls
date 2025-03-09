@@ -11,7 +11,7 @@ app = Flask(__name__)
 
 @app.route('/playlist')
 def serve_playlist():
-    return send_file("C:/Users/HP/Documents/cvb/ohh.m3u", as_attachment=False)
+    return send_file("ohh.m3u", as_attachment=False)
 
 
 PORTAL = "tatatv.cc"
