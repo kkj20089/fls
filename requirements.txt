@@ -1,4 +1,3 @@
 Flask
 requests
 cloudscraper
-concurrent.futures
