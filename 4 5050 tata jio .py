@@ -3,6 +3,7 @@ import requests
 import cloudscraper
 from flask import Flask, redirect, request, send_file
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 app = Flask(__name__)
 
@@ -35,47 +36,11 @@ JIO_BASE_HEADERS = {
 # Token cache for Jio TV
 TOKEN_CACHE = {}
 
-def make_tata_request(url, headers):
-    """Helper function to send requests asynchronously for Tata TV"""
-    try:
-        response = requests.get(url, headers=headers, verify=False, timeout=5)
-        return response.json()
-    except requests.exceptions.RequestException:
-        return None
-
-def fetch_jio_token(user_ip):
-    """Fetches the Bearer token and caches it for Jio TV"""
-    if "token" in TOKEN_CACHE and time.time() - TOKEN_CACHE["timestamp"] < 3600:
-        return TOKEN_CACHE["random"], TOKEN_CACHE["token"]
-    
-    handshake_url = f"http://{JIO_PORTAL}/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml"
-    headers = JIO_BASE_HEADERS.copy()
-    headers["X-Forwarded-For"] = user_ip
-    headers["Cookie"] = f"mac={JIO_MAC}; stb_lang=en; timezone=GMT"
-    
-    response = scraper.get(handshake_url, headers=headers, verify=False, timeout=5)
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            TOKEN_CACHE["random"] = data["js"].get("random")
-            TOKEN_CACHE["token"] = data["js"].get("token")
-            TOKEN_CACHE["timestamp"] = time.time()
-            return TOKEN_CACHE["random"], TOKEN_CACHE["token"]
-        except:
-            return None, None
-    return None, None
-
-# Playlist Routes
 @app.route('/playlist')
-def jio_playlist():
-    return send_file(r"C:\Users\HP\Documents\m3u server\m3u\3 jio 5050.m3u", as_attachment=False)
+def send_playlist():
+    return send_file("4 tata jio 5050.m3u", as_attachment=False)
 
-@app.route('/tata/playlist')
-def tata_playlist():
-    return send_file(r"C:\Users\HP\Documents\m3u server\m3u\4 tata jio 5050.m3u", as_attachment=False)
-
-# Stream Routes
-@app.route('/stream/<channel_id>')
+@app.route('/jio/<channel_id>')
 def jio_stream(channel_id):
     user_ip = request.remote_addr
     timestamp = int(time.time())
@@ -105,12 +70,11 @@ def jio_stream(channel_id):
             return "Failed to parse stream response", 400
     return "Failed to retrieve stream link", 400
 
-@app.route('/stream/tata/<channel_id>')
+@app.route('/tata/<channel_id>')
 def tata_stream(channel_id):
     user_ip = request.remote_addr
     timestamp = int(time.time())
     
-    # Step 1: Handshake
     url1 = f"http://{TATA_PORTAL}/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml"
     headers = {
         "Cookie": f"mac={TATA_MAC}; stb_lang=en; timezone=GMT",
@@ -132,14 +96,9 @@ def tata_stream(channel_id):
     if not real_token:
         return "Failed to retrieve authorization token", 400
 
-    # Step 2: Get Profile (Parallel request)
-    url2 = f"http://{TATA_PORTAL}/stalker_portal/server/load.php?type=stb&action=get_profile&hd=1&sn={TATA_SERIAL}&stb_type=MAG270&device_id={TATA_DEVICE_ID}&device_id2={TATA_DEVICE_ID2}&timestamp={timestamp}&metrics={{\"mac\":\"{TATA_MAC}\",\"sn\":\"{TATA_SERIAL}\",\"model\":\"MAG270\",\"type\":\"STB\",\"uid\":\"{TATA_DEVICE_ID}\",\"random\":\"{token}\"}}&JsHttpRequest=1-xml"
-    headers["Authorization"] = f"Bearer {real_token}"
-
-    executor.submit(requests.get, url2, headers)  # No need to wait for this response
-
-    # Step 3: Generate Stream Link (Parallel request)
     url3 = f"http://{TATA_PORTAL}/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/{channel_id}&JsHttpRequest=1-xml"
+    headers["Authorization"] = f"Bearer {real_token}"
+    
     future3 = executor.submit(make_tata_request, url3, headers)
     data3 = future3.result()
 
@@ -147,7 +106,7 @@ def tata_stream(channel_id):
         return "Failed to retrieve stream link", 400
 
     stream_url = data3.get("js", {}).get("cmd", "")
-
+    
     if not stream_url:
         return "Failed to retrieve stream link", 400
     
