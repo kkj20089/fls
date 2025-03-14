@@ -1,7 +1,7 @@
 import time
 import requests
 import cloudscraper
-from flask import Flask, redirect, request, send_file
+from flask import Flask, redirect, request, send_file, abort
 from concurrent.futures import ThreadPoolExecutor
 import os
 
@@ -36,81 +36,61 @@ JIO_BASE_HEADERS = {
 # Token cache for Jio TV
 TOKEN_CACHE = {}
 
+# Serve the Playlist File
 @app.route('/playlist')
 def send_playlist():
-    return send_file("4 tata jio 5050.m3u", as_attachment=False)
+    if os.path.exists("4 tata jio 5050.m3u"):
+        return send_file("4 tata jio 5050.m3u", as_attachment=False)
+    else:
+        abort(404, description="Playlist file not found")
 
+# Stream Jio TV
 @app.route('/jio/<channel_id>')
 def jio_stream(channel_id):
+    return get_stream_link(JIO_PORTAL, JIO_MAC, JIO_DEVICE_ID, JIO_DEVICE_ID2, JIO_SERIAL, JIO_SIG, channel_id)
+
+# Stream Tata TV
+@app.route('/tata/<channel_id>')
+def tata_stream(channel_id):
+    return get_stream_link(TATA_PORTAL, TATA_MAC, TATA_DEVICE_ID, TATA_DEVICE_ID2, TATA_SERIAL, "", channel_id)
+
+# Fetch Streaming Link
+def get_stream_link(portal, mac, device_id, device_id2, serial, sig, channel_id):
     user_ip = request.remote_addr
     timestamp = int(time.time())
     
-    token, real_token = fetch_jio_token(user_ip)
+    handshake_url = f"http://{portal}/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml"
+    headers = {
+        "Cookie": f"mac={mac}; stb_lang=en; timezone=GMT",
+        "X-Forwarded-For": user_ip,
+        "Referer": f"http://{portal}/stalker_portal/c/",
+        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG250 stbapp ver: 2 rev: 250 Safari/533.3",
+        "X-User-Agent": "Model: MAG250; Link:",
+    }
+    
+    response = scraper.get(handshake_url, headers=headers, verify=False, timeout=5)
+    if response.status_code != 200:
+        return "Failed to retrieve authorization token", 400
+    
+    data = response.json()
+    token = data.get("js", {}).get("random", "")
+    real_token = data.get("js", {}).get("token", "")
+    
     if not real_token:
         return "Failed to retrieve authorization token", 400
     
-    profile_url = f"http://{JIO_PORTAL}/stalker_portal/server/load.php?type=stb&action=get_profile&hd=1&num_banks=2&sn={JIO_SERIAL}&stb_type=MAG254&device_id={JIO_DEVICE_ID}&device_id2={JIO_DEVICE_ID2}&signature={JIO_SIG}&timestamp={timestamp}&metrics={{\"mac\":\"{JIO_MAC}\",\"sn\":\"{JIO_SERIAL}\",\"model\":\"MAG254\",\"type\":\"STB\",\"uid\":\"{JIO_DEVICE_ID}\",\"random\":\"{token}\"}}&JsHttpRequest=1-xml"
-    headers = JIO_BASE_HEADERS.copy()
-    headers["X-Forwarded-For"] = user_ip
-    headers["Cookie"] = f"mac={JIO_MAC}; stb_lang=en; timezone=GMT"
+    stream_url = f"http://{portal}/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/{channel_id}&JsHttpRequest=1-xml"
     headers["Authorization"] = f"Bearer {real_token}"
-    
-    scraper.get(profile_url, headers=headers, verify=False, timeout=5)
-    
-    stream_url = f"http://{JIO_PORTAL}/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/{channel_id}&JsHttpRequest=1-xml"
     response = scraper.get(stream_url, headers=headers, verify=False, timeout=5)
     
     if response.status_code == 200:
         try:
-            data = response.json()
-            stream_link = data["js"].get("cmd", "")
+            stream_link = response.json().get("js", {}).get("cmd", "")
             if stream_link:
                 return redirect(stream_link, code=302)
         except:
             return "Failed to parse stream response", 400
     return "Failed to retrieve stream link", 400
-
-@app.route('/tata/<channel_id>')
-def tata_stream(channel_id):
-    user_ip = request.remote_addr
-    timestamp = int(time.time())
-    
-    url1 = f"http://{TATA_PORTAL}/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml"
-    headers = {
-        "Cookie": f"mac={TATA_MAC}; stb_lang=en; timezone=GMT",
-        "X-Forwarded-For": user_ip,
-        "Referer": f"http://{TATA_PORTAL}/stalker_portal/c/",
-        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG270 stbapp ver: 2 rev: 250 Safari/533.3",
-        "X-User-Agent": "Model: MAG270; Link:"
-    }
-    
-    future1 = executor.submit(make_tata_request, url1, headers)
-    data1 = future1.result()
-
-    if not data1:
-        return "Failed to retrieve authorization token", 400
-
-    token = data1.get("js", {}).get("random", "")
-    real_token = data1.get("js", {}).get("token", "")
-
-    if not real_token:
-        return "Failed to retrieve authorization token", 400
-
-    url3 = f"http://{TATA_PORTAL}/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/{channel_id}&JsHttpRequest=1-xml"
-    headers["Authorization"] = f"Bearer {real_token}"
-    
-    future3 = executor.submit(make_tata_request, url3, headers)
-    data3 = future3.result()
-
-    if not data3:
-        return "Failed to retrieve stream link", 400
-
-    stream_url = data3.get("js", {}).get("cmd", "")
-    
-    if not stream_url:
-        return "Failed to retrieve stream link", 400
-    
-    return redirect(stream_url, code=302)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050, threaded=True)
