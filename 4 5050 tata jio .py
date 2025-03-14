@@ -39,8 +39,9 @@ TOKEN_CACHE = {}
 # Serve the Playlist File
 @app.route('/playlist')
 def send_playlist():
-    if os.path.exists("4 tata jio 5050.m3u"):
-        return send_file("4 tata jio 5050.m3u", as_attachment=False)
+    playlist_path = "playlist.m3u"
+    if os.path.exists(playlist_path):
+        return send_file(playlist_path, as_attachment=False)
     else:
         abort(404, description="Playlist file not found")
 
