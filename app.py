@@ -65,14 +65,20 @@ def fetch_jio_token(user_ip):
             return None, None
     return None, None
     
-@app.route('/test')
-def test():
-    test_url = "http://jiotv.be/stalker_portal/server/load.php"
+app.route("/test-vercel")
+def test_vercel():
+    """Test if Vercel can reach Jio & Tata servers."""
     try:
-        response = requests.get(test_url, timeout=5)
-        return f"Status: {response.status_code}\n\nResponse:\n{response.text}"
+        jio_test = requests.get(f"{JIO_PORTAL}/server/load.php", timeout=5)
+        tata_test = requests.get(f"{TATA_PORTAL}/stalker_portal/server/load.php", timeout=5)
+        return jsonify({
+            "jio_status": jio_test.status_code,
+            "jio_response": jio_test.text[:200],
+            "tata_status": tata_test.status_code,
+            "tata_response": tata_test.text[:200]
+        })
     except Exception as e:
-        return f"Request failed: {str(e)}", 500
+        return jsonify({"error": str(e)})
 
 
 # **📜 Serve playlist.m3u from GitHub**
