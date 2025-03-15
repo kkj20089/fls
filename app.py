@@ -35,7 +35,7 @@ JIO_BASE_HEADERS = {
 TOKEN_CACHE = {}
 
 def fetch_jio_token(user_ip):
-    """Fetches the Bearer token and caches it for Jio TV"""
+    """Fetches the Bearer token and caches it for Jio TV, with logging for debugging"""
     if "token" in TOKEN_CACHE and time.time() - TOKEN_CACHE["timestamp"] < 3600:
         return TOKEN_CACHE["random"], TOKEN_CACHE["token"]
     
@@ -51,9 +51,10 @@ def fetch_jio_token(user_ip):
         TOKEN_CACHE["random"] = data["js"].get("random")
         TOKEN_CACHE["token"] = data["js"].get("token")
         TOKEN_CACHE["timestamp"] = time.time()
+        app.logger.info(f"Jio Token Fetched: {TOKEN_CACHE}")
         return TOKEN_CACHE["random"], TOKEN_CACHE["token"]
     except Exception as e:
-        app.logger.error(f"Error fetching Jio token: {str(e)}")
+        app.logger.error(f"Error fetching Jio token: {str(e)} - Response: {response.text if response else 'No Response'}")
         return None, None
 
 @app.route('/')
@@ -84,7 +85,7 @@ def jio_stream(channel_id):
         if stream_link:
             return redirect(stream_link, code=302)
     except Exception as e:
-        app.logger.error(f"Error fetching Jio stream: {str(e)}")
+        app.logger.error(f"Error fetching Jio stream: {str(e)} - Response: {response.text if response else 'No Response'}")
         return "Failed to retrieve stream link", 400
 
 if __name__ == '__main__':
