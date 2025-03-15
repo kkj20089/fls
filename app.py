@@ -179,4 +179,5 @@ def tata_stream(channel_id):
     return redirect(stream_url, code=302)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050, threaded=True)
+    app.run(host='0.0.0.0', port=5050, threaded=True, from gunicorn.app.wsgiapp import run
+    run())
