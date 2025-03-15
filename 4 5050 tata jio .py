@@ -1,97 +1,93 @@
-import time
-import requests
-import cloudscraper
-from flask import Flask, redirect, request, send_file, abort
-from concurrent.futures import ThreadPoolExecutor
-import os
-
-app = Flask(__name__)
-
-# Initialize both clients
-executor = ThreadPoolExecutor(max_workers=3)  # For Tata TV
-scraper = cloudscraper.create_scraper()  # For Jio TV
-
-# Tata TV Settings
-TATA_PORTAL = "tatatv.cc"
-TATA_MAC = "00:1A:79:81:9A:33"
-TATA_DEVICE_ID = "2D05EFECF7FE08B31042E28DDE03AF5EC85EE02E2E1A8596A905218B6E8E76EE"
-TATA_DEVICE_ID2 = "2D05EFECF7FE08B31042E28DDE03AF5EC85EE02E2E1A8596A905218B6E8E76EE"
-TATA_SERIAL = "C024F6E468BBD"
-
-# Jio TV Settings
-JIO_PORTAL = "jiotv.be"
-JIO_MAC = "00:1A:79:1B:06:6C"
-JIO_DEVICE_ID = "B7C1B08117DE65D937DE72A85D758B00BD9297F8BCAF68D674CF2127DF712F64"
-JIO_DEVICE_ID2 = "B7C1B08117DE65D937DE72A85D758B00BD9297F8BCAF68D674CF2127DF712F64"
-JIO_SERIAL = "4A3361CFC51F8"
-JIO_SIG = ""
-
-# Base headers for Jio TV
-JIO_BASE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3",
-    "X-User-Agent": "Model: MAG250; Link:",
-    "Referer": f"http://{JIO_PORTAL}/stalker_portal/c/",
+<?php
+// Check if the request is for the playlist
+if ($_SERVER['REQUEST_URI'] == '/playlist') {
+    // Get user IP and port
+    $user_ip = !empty($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'localhost';
+    $user_port = $_SERVER['SERVER_PORT'];
+    
+    // Define the playlist content
+    $playlist_content = "#EXTM3U\n";
+    $playlist_content .= "#EXTINF:-1 tvg-id=\"14597\" tvg-logo=\"\" group-title=\"ENGLISH CA\",AQUARIUM 4K\n";
+    $playlist_content .= "$user_ip:$user_port/stream/14597\n";
+    $playlist_content .= "#EXTINF:-1 tvg-id=\"10770\" tvg-logo=\"\" group-title=\"ENGLISH CA\",FIREPLACE TV 4K\n";
+    $playlist_content .= "$user_ip:$user_port/stream/10770\n";
+    $playlist_content .= "#EXTINF:-1 tvg-id=\"3\" tvg-logo=\"http://jiotv.be/stalker_portal/misc/logos/320/3.png\" group-title=\"ENGLISH CA\",GLOBAL 4K cc\n";
+    $playlist_content .= "$user_ip:$user_port/stream/3\n";
+    $playlist_content .= "#EXTINF:-1 tvg-id=\"6\" tvg-logo=\"\" group-title=\"ENGLISH CA\",OMNI 1 4K cc\n";
+    $playlist_content .= "$user_ip:$user_port/stream/6\n";
+    $playlist_content .= "#EXTINF:-1 tvg-id=\"10\" tvg-logo=\"\" group-title=\"ENGLISH CA\",CBC TORONTO 4K cc\n";
+    $playlist_content .= "$user_ip:$user_port/stream/10\n";
+    
+    // Save the playlist content to a file
+    file_put_contents('playlist.m3u', $playlist_content);
+    
+    // Serve the playlist file
+    header('Content-Type: audio/x-mpegurl');
+    header('Content-Disposition: attachment; filename="playlist.m3u"');
+    echo $playlist_content;
+    exit;
 }
 
-# Token cache for Jio TV
-TOKEN_CACHE = {}
-
-# Serve the Playlist File
-@app.route('/playlist')
-def send_playlist():
-    playlist_path = "playlist.m3u"
-    if os.path.exists(playlist_path):
-        return send_file(playlist_path, as_attachment=False)
-    else:
-        abort(404, description="Playlist file not found")
-
-# Stream Jio TV
-@app.route('/jio/<channel_id>')
-def jio_stream(channel_id):
-    return get_stream_link(JIO_PORTAL, JIO_MAC, JIO_DEVICE_ID, JIO_DEVICE_ID2, JIO_SERIAL, JIO_SIG, channel_id)
-
-# Stream Tata TV
-@app.route('/tata/<channel_id>')
-def tata_stream(channel_id):
-    return get_stream_link(TATA_PORTAL, TATA_MAC, TATA_DEVICE_ID, TATA_DEVICE_ID2, TATA_SERIAL, "", channel_id)
-
-# Fetch Streaming Link
-def get_stream_link(portal, mac, device_id, device_id2, serial, sig, channel_id):
-    user_ip = request.remote_addr
-    timestamp = int(time.time())
-    
-    handshake_url = f"http://{portal}/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml"
-    headers = {
-        "Cookie": f"mac={mac}; stb_lang=en; timezone=GMT",
-        "X-Forwarded-For": user_ip,
-        "Referer": f"http://{portal}/stalker_portal/c/",
-        "User-Agent": "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG250 stbapp ver: 2 rev: 250 Safari/533.3",
-        "X-User-Agent": "Model: MAG250; Link:",
-    }
-    
-    response = scraper.get(handshake_url, headers=headers, verify=False, timeout=5)
-    if response.status_code != 200:
-        return "Failed to retrieve authorization token", 400
-    
-    data = response.json()
-    token = data.get("js", {}).get("random", "")
-    real_token = data.get("js", {}).get("token", "")
-    
-    if not real_token:
-        return "Failed to retrieve authorization token", 400
-    
-    stream_url = f"http://{portal}/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/{channel_id}&JsHttpRequest=1-xml"
-    headers["Authorization"] = f"Bearer {real_token}"
-    response = scraper.get(stream_url, headers=headers, verify=False, timeout=5)
-    
-    if response.status_code == 200:
-        try:
-            stream_link = response.json().get("js", {}).get("cmd", "")
-            if stream_link:
-                return redirect(stream_link, code=302)
-        except:
-            return "Failed to parse stream response", 400
-    return "Failed to retrieve stream link", 400
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050, threaded=True)
+// Original code starts here
+$id = @$_GET['id'];
+$user_ip = $_SERVER['REMOTE_ADDR'];
+$currentTimestamp = time();
+$portal = "new.jiotv.be";
+$mac = "00:1A:79:97:55:B9";
+$deviceid = "B8F453DCDAEE02318C9FA912D9E409EE96B75AE592A70B526AA84478533C0A66";
+$deviceid2 = "B8F453DCDAEE02318C9FA912D9E409EE96B75AE592A70B526AA84478533C0A66";
+$serial = "500482917046B";
+$sig = "";
+$n1 = "http://$portal/stalker_portal/server/load.php?type=stb&action=handshake&prehash=false&JsHttpRequest=1-xml";
+$h1 = [ 
+    "Cookie: mac=$mac; stb_lang=en; timezone=GMT", 
+    "X-Forwarded-For: $user_ip", 
+    "Referer: http://$portal/stalker_portal/c/", 
+    "User-Agent: Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3", 
+    "X-User-Agent: Model: MAG250; Link:", 
+];
+$c1_curl = curl_init();
+curl_setopt($c1_curl, CURLOPT_URL, $n1);
+curl_setopt($c1_curl, CURLOPT_SSL_VERIFYHOST, false);
+curl_setopt($c1_curl, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($c1_curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($c1_curl, CURLOPT_HTTPHEADER, $h1);
+curl_setopt($c1_curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3');
+$res1 = curl_exec($c1_curl);
+curl_close($c1_curl);
+$response = json_decode($res1, true);
+$token = $response['js']['random'];
+$real = $response['js']['token'];
+$bearer_token = $real ?? ""; // Fetch the token dynamically
+$h2 = [
+    "Cookie: mac=$mac; stb_lang=en; timezone=GMT",
+    "X-Forwarded-For: $user_ip",
+    "Authorization: Bearer $bearer_token",
+    "Referer: http://$portal/stalker_portal/c/",
+    "User-Agent: Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3",
+    "X-User-Agent: Model: MAG250; Link:",
+];
+$n2 = "http://$portal/stalker_portal/server/load.php?type=stb&action=get_profile&hd=1&ver=ImageDescription: 0.2.18-r14-pub-250; ImageDate: Fri Jan 15 15:20:44 EET 2016; PORTAL version: 5.5.0; API Version: JS API version: 328; STB API version: 134; Player Engine version: 0x566&num_banks=2&sn=$serial&stb_type=MAG254&image_version=218&video_out=hdmi&device_id=$deviceid&device_id2=$deviceid2&signature=$sig&auth_second_step=1&hw_version=1.7-BD-00&not_valid_token=0&client_type=STB&hw_version_2=7c431b0aec69b2f0194c0680c32fe4e3&timestamp=$currentTimestamp&api_signature=263&metrics={\"mac\":\"$mac\",\"sn\":\"$serial\",\"model\":\"MAG254\",\"type\":\"STB\",\"uid\":\"$deviceid\",\"random\":\"$token\"}&JsHttpRequest=1-xml";
+$c2_curl = curl_init();
+curl_setopt($c2_curl, CURLOPT_URL, $n2);
+curl_setopt($c2_curl, CURLOPT_SSL_VERIFYHOST, false);
+curl_setopt($c2_curl, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($c2_curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($c2_curl, CURLOPT_HTTPHEADER, $h2);
+curl_setopt($c2_curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3');
+$res2 = curl_exec($c2_curl);
+curl_close($c2_curl);
+$n3 = "http://$portal/stalker_portal/server/load.php?type=itv&action=create_link&cmd=ffrt%http://localhost/ch/$id&JsHttpRequest=1-xml";
+$c3_curl = curl_init();
+curl_setopt($c3_curl, CURLOPT_URL, $n3);
+curl_setopt($c3_curl, CURLOPT_SSL_VERIFYHOST, false);
+curl_setopt($c3_curl, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($c3_curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($c3_curl, CURLOPT_HTTPHEADER, $h2);
+curl_setopt($c3_curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3');
+$res3 = curl_exec($c3_curl);
+curl_close($c3_curl);
+$i6 = json_decode($res3, true);
+$d7 = $i6["js"]["cmd"];
+header("Location: " . $d7);
+die;
