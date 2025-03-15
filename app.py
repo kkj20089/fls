@@ -64,6 +64,12 @@ def fetch_jio_token(user_ip):
         except:
             return None, None
     return None, None
+    
+@app.route('/test')
+def test():
+    test_url = "http://jiotv.be/stalker_portal/server/load.php"
+    response = requests.get(test_url, timeout=5)
+    return response.text, response.status_code
 
 # **📜 Serve playlist.m3u from GitHub**
 @app.route('/playlist')
