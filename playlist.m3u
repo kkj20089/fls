@@ -391,7 +391,7 @@ http://192.168.1.3:5050/inde.php/stream/103
 http://192.168.1.3:5050/inde.php/stream/102
 
 #EXTINF:-1 tvg-id="109" tvg-logo="" group-title="ENGLISH CA",OMNI BC 4K
-http://192.168.1.2:5050/stream/109
+http://192.168.1.3:5050/inde.php/stream/109
 
 #EXTINF:-1 tvg-id="14395" tvg-logo="" group-title="ENGLISH CA",GLOBAL NEWS BC 4K
 http://192.168.1.3:5050/inde.php/stream/14395
@@ -664,7 +664,7 @@ http://192.168.1.3:5050/inde.php/stream/149
 http://192.168.1.3:5050/inde.php/stream/156
 
 #EXTINF:-1 tvg-id="161" tvg-logo="" group-title="HINDI",STAR PLUS INDIA HD
-https://allinonereborn.in/jiobe199.m3u8?id=161
+http://192.168.1.3:5050/inde.php/stream/161
 
 #EXTINF:-1 tvg-id="165" tvg-logo="" group-title="HINDI",STAR PLUS USA HD cc
 http://192.168.1.3:5050/inde.php/stream/165
