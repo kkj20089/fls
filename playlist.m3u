@@ -7,7 +7,7 @@ localhost:5050/inde.php/stream/14597
 localhost:5050/inde.php/stream/10770
 
 #EXTINF:-1 tvg-id="3" tvg-logo="http://jiotv.be/stalker_portal/misc/logos/320/3.png" group-title="ENGLISH CA",GLOBAL 4K cc
-localhost:5050/inde.php/stream/3
+localhost:5050/stream/3
 
 #EXTINF:-1 tvg-id="6" tvg-logo="" group-title="ENGLISH CA",OMNI 1 4K cc
 localhost:5050/inde.php/stream/6
